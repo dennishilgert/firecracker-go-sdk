@@ -27,19 +27,38 @@ type kernelArgs map[string]*string
 // to the kernel
 func (kargs kernelArgs) String() string {
 	var fields []string
+	var initField *string
 	for key, value := range kargs {
 		field := key
 		if value != nil {
 			field += "=" + *value
 		}
+		if key == "init" {
+			initField = &field
+			continue
+		}
 		fields = append(fields, field)
 	}
-	return strings.Join(fields, " ")
+
+	kernelArgsString := strings.Join(fields, " ")
+
+	// add init as last field because otherwise this would screw up the entire kernel args
+	if initField != nil {
+		kernelArgsString += " " + *initField
+	}
+
+	return kernelArgsString
 }
 
 // deserialize the provided string to a kernelArgs map
 func parseKernelArgs(rawString string) kernelArgs {
 	argMap := make(map[string]*string)
+	var initArgs *string
+	if strings.Contains(rawString, "init=") {
+		initSplit := strings.SplitN(rawString, "init=", 2)
+		rawString = strings.TrimSpace(initSplit[0])
+		initArgs = &initSplit[1]
+	}
 	for _, kv := range strings.Fields(rawString) {
 		// only split into up to 2 fields (before and after the first "=")
 		kvSplit := strings.SplitN(kv, "=", 2)
@@ -52,6 +71,11 @@ func parseKernelArgs(rawString string) kernelArgs {
 		}
 
 		argMap[key] = value
+	}
+
+	// add init separately because otherways this would screw up the entire kernel args
+	if initArgs != nil {
+		argMap["init"] = initArgs
 	}
 
 	return argMap
